@@ -90,11 +90,11 @@ router.post("/create", async (req, res) => {
 router.get("/", async (req, res) => {
     try {
         //verify request
-        const { group_id } = req.query;
+        const { survey_id } = req.query;
 
         let count = await survey_group.count({
             where: {
-                id: group_id,
+                id: survey_id,
                 is_delete: false,
             },
         });
@@ -107,19 +107,19 @@ router.get("/", async (req, res) => {
         let result = await survey_group.findOne({
             attributes: [ "name", "description" ],
             where: {
-                id: group_id,
+                id: survey_id,
                 is_delete: false,
             },
             include: {
                 model: survey_question,
-                attributes: [ "question", "description" ],
+                attributes: [ "id", "question", "description" ],
                 required: false,
                 where: {
                     is_delete: false,
                 },
                 include: {
                     model: survey_choice,
-                    attributes: [ "choice", "type", "description" ],
+                    attributes: [ "id", "choice", "type", "description" ],
                     required: false,
                     where: {
                         is_delete: false,
@@ -135,10 +135,12 @@ router.get("/", async (req, res) => {
                 description: result.dataValues.description,
                 question: result.dataValues.survey_questions.map(element => {
                     return {
+                        question_id: element.dataValues.id,
                         question: element.dataValues.question,
                         description: element.dataValues.description,
                         choice: element.dataValues.survey_choices.map(element2 => {
                             return {
+                                choice_id: element2.dataValues.id,
                                 choice: element2.dataValues.choice,
                                 type: element2.dataValues.type,
                                 description: element2.dataValues.description,
@@ -156,13 +158,13 @@ router.get("/", async (req, res) => {
 router.post("/", async (req, res) => {
     try {
         //check group
-        const { group_id, user_id } = req.query;
+        const { survey_id, user_id } = req.query;
         const { result } = req.body;
 
         let group = await survey_group.findOne({
             attributes: [ "id" ],
             where: {
-                id: group_id,
+                id: survey_id,
                 is_delete: false,
             },
             include: {
@@ -185,6 +187,17 @@ router.post("/", async (req, res) => {
 
         if (!group) {
             return res.status(404).json({ message: "survey not found" });
+        }
+        //check user
+        let answer = await survey_result.findOne({
+            where: {
+                user_id,
+                survey_group_id: survey_id,
+            },
+        });
+
+        if (answer) {
+            return res.status(403).json({ message: "user already done this survey" });
         }
         //reformat body
         let choices = {};
@@ -242,8 +255,8 @@ router.post("/", async (req, res) => {
             group.dataValues.survey_questions.forEach(element => {
                 let question_id = element.id;
 
-                if (element.dataValues.choices) {
-                    element.dataValues.choices.forEach(element2 => {
+                if (element.dataValues.survey_choices) {
+                    element.dataValues.survey_choices.forEach(element2 => {
                         if (choices[element2.dataValues.id]) {
                             let c = choices[element2.dataValues.id];
 
@@ -252,14 +265,13 @@ router.post("/", async (req, res) => {
                             if (c.question_id != question_id || c.type != element2.dataValues.type) {
                                 return res.status(400).json({ message: "invalid body" });
                             }
-                        } else {
+                        } else if (element2.dataValues.type == "input") {
                             return res.status(400).json({ message: "invalid body" });
                         }
                     });    
                 }
             });
         }
-
         if (n != 0) {
             return res.status(400).json({ message: "invalid body" });
         }
@@ -270,7 +282,7 @@ router.post("/", async (req, res) => {
             let choice = choices[choice_id];
 
             promise.push(survey_result.create({
-                survey_group_id: result.survey_id,
+                survey_group_id: survey_id,
                 survey_question_id: choice.question_id,
                 survey_choice_id: choice_id,
                 user_id,
@@ -282,6 +294,7 @@ router.post("/", async (req, res) => {
         //success
         return res.json({ message: "success" });
     } catch(err) {
+        console.log(err);
         return res.status(404).json({ message: "not found" });
     }
 });
