@@ -8,31 +8,31 @@ router.post("/create", async (req, res) => {
         const { group, description, question } = req.body;
 
         if (!group) {
-            return res.status(400).json({ message: "invalid body1" });
+            return res.status(400).json({ message: "invalid body" });
         }
 
         if (Array.isArray(question)) {
             question.forEach(element => {
                 if (!element.question) {
-                    return res.status(400).json({ message: "invalid body2" });
+                    return res.status(400).json({ message: "invalid body" });
                 }
 
                 if (Array.isArray(element.choice)) {
                     element.choice.forEach(element2 => {
                         if (!element2.choice || !element2.type) {
-                            return res.status(400).json({ message: "invalid body3" });
+                            return res.status(400).json({ message: "invalid body" });
                         }
 
                         if(element2.type != "checkbox" && element2.type != "select" && element2.type != "input") {
-                            return res.status(400).json({ message: "invalid body4" });
+                            return res.status(400).json({ message: "invalid body" });
                         }
                     });
                 } else if (element.choice) {
-                    return res.status(400).json({ message: "invalid body5" });
+                    return res.status(400).json({ message: "invalid body" });
                 }
             });
         } else if (question) {
-            return res.status(400).json({ message: "invalid body6" });
+            return res.status(400).json({ message: "invalid body" });
         }
 
         //send database query
@@ -148,6 +148,139 @@ router.get("/", async (req, res) => {
                 }),
             },
         });
+    } catch(err) {
+        return res.status(404).json({ message: "not found" });
+    }
+});
+
+router.post("/", async (req, res) => {
+    try {
+        //check group
+        const { group_id, user_id } = req.query;
+        const { result } = req.body;
+
+        let group = await survey_group.findOne({
+            attributes: [ "id" ],
+            where: {
+                id: group_id,
+                is_delete: false,
+            },
+            include: {
+                model: survey_question,
+                attributes: [ "id" ],
+                required: false,
+                where: {
+                    is_delete: false,
+                },
+                include: {
+                    model: survey_choice,
+                    attributes: [ "id", "type" ],
+                    required: false,
+                    where: {
+                        is_delete: false,
+                    },
+                }
+            },
+        });
+
+        if (!group) {
+            return res.status(404).json({ message: "survey not found" });
+        }
+        //reformat body
+        let choices = {};
+        let n = 0;
+
+        if (Array.isArray(result.question)) {
+            result.question.forEach(element => {
+                if (!element.question_id) {
+                    return res.status(400).json({ message: "invalid body" });
+                }
+
+                let question_id = element.question_id;
+                let select = 0;
+
+                if (Array.isArray(element.choice)) {
+                    element.choice.forEach(element2 => {
+                        if (typeof element2.choice_id != "number" || typeof element2.type != "string") {
+                            return res.status(400).json({ message: "invalid body" });
+                        }
+
+                        if (element2.type != "checkbox" && element2.type != "select" && element2.type != "input") {
+                            return res.status(400).json({ message: "invalid body" });
+                        }
+
+                        if (element2.type == "select") {
+                            select += 1;
+                            if (select > 1) {
+                                return res.status(400).json({ message: "invalid body" });
+                            }
+                        }
+
+                        if (element2.type == "input") {
+                            if (typeof element2.result != "string") {
+                                return res.status(400).json({ message: "invalid body" });
+                            }
+                        }
+
+                        n += 1;
+
+                        choices[element2.choice_id] = {
+                            question_id,
+                            type: element2.type,
+                            result: element2.result || null,
+                        };
+                    });
+                } else if (element.choice) {
+                    return res.status(400).json({ message: "invalid body" });
+                }
+            });
+        } else if (result.question) {
+            return res.status(400).json({ message: "invalid body" });
+        }
+        //verify result
+        if (group.dataValues.survey_questions) {
+            group.dataValues.survey_questions.forEach(element => {
+                let question_id = element.id;
+
+                if (element.dataValues.choices) {
+                    element.dataValues.choices.forEach(element2 => {
+                        if (choices[element2.dataValues.id]) {
+                            let c = choices[element2.dataValues.id];
+
+                            n -= 1;
+
+                            if (c.question_id != question_id || c.type != element2.dataValues.type) {
+                                return res.status(400).json({ message: "invalid body" });
+                            }
+                        } else {
+                            return res.status(400).json({ message: "invalid body" });
+                        }
+                    });    
+                }
+            });
+        }
+
+        if (n != 0) {
+            return res.status(400).json({ message: "invalid body" });
+        }
+        //send database query
+        let promise = [];
+        
+        for (let choice_id in choices) {
+            let choice = choices[choice_id];
+
+            promise.push(survey_result.create({
+                survey_group_id: result.survey_id,
+                survey_question_id: choice.question_id,
+                survey_choice_id: choice_id,
+                user_id,
+                result: choice.result,
+            }));
+        }
+
+        await Promise.all(promise);
+        //success
+        return res.json({ message: "success" });
     } catch(err) {
         return res.status(404).json({ message: "not found" });
     }
