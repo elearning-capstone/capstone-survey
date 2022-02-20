@@ -7,6 +7,8 @@ router.post("/create", async (req, res) => {
         //verify request
         const { group, description, question } = req.body;
 
+        let is_valid = true;
+
         if (!group) {
             return res.status(400).json({ message: "invalid body" });
         }
@@ -14,23 +16,24 @@ router.post("/create", async (req, res) => {
         if (Array.isArray(question)) {
             question.forEach(element => {
                 if (!element.question) {
-                    return res.status(400).json({ message: "invalid body" });
+                    is_valid = false;
                 }
 
                 if (Array.isArray(element.choice)) {
                     element.choice.forEach(element2 => {
                         if (!element2.choice || !element2.type) {
-                            return res.status(400).json({ message: "invalid body" });
+                            is_valid = false;
                         }
 
                         if(element2.type != "checkbox" && element2.type != "select" && element2.type != "input") {
-                            return res.status(400).json({ message: "invalid body" });
+                            is_valid = false;
                         }
                     });
                 } else if (element.choice) {
-                    return res.status(400).json({ message: "invalid body" });
+                    is_valid = false;
                 }
             });
+            if (!is_valid) return res.status(400).json({ message: "invalid body" });
         } else if (question) {
             return res.status(400).json({ message: "invalid body" });
         }
