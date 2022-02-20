@@ -294,7 +294,6 @@ router.post("/", async (req, res) => {
         //success
         return res.json({ message: "success" });
     } catch(err) {
-        console.log(err);
         return res.status(404).json({ message: "not found" });
     }
 });
@@ -400,7 +399,6 @@ router.get("/result", async (req, res) => {
             result,
         });
     } catch(err) {
-        console.log(err);
         return res.status(404).json({ message: "not found" });
     }
 });
