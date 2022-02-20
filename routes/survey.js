@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { survey_group, survey_question, survey_choice, survey_result } = require("../models");
+const { survey_group, survey_question, survey_choice, survey_result, sequelize } = require("../models");
 
 router.post("/create", async (req, res) => {
     try {
@@ -293,6 +293,112 @@ router.post("/", async (req, res) => {
         await Promise.all(promise);
         //success
         return res.json({ message: "success" });
+    } catch(err) {
+        console.log(err);
+        return res.status(404).json({ message: "not found" });
+    }
+});
+
+router.get("/result", async (req, res) => {
+    try {
+        //verify request
+        const { survey_id } = req.query;
+
+        let count = await survey_group.count({
+            where: {
+                id: survey_id,
+                is_delete: false,
+            },
+        });
+
+        if (count == 0) {
+            return res.status(404).json({ message: "survey not found" });
+        }
+
+        //send database query
+        let result = await survey_group.findOne({
+            attributes: [ "id", "name", "description" ],
+            where: {
+                id: survey_id,
+                is_delete: false,
+            },
+            include: {
+                model: survey_question,
+                attributes: [ "id", "question", "description" ],
+                required: false,
+                where: {
+                    is_delete: false,
+                },
+                include: {
+                    model: survey_choice,
+                    attributes: [ "id", "choice", "type", "description", [sequelize.fn("count", sequelize.col("survey_questions->survey_choices->survey_results.id")), "count"] ],
+                    required: false,
+                    where: {
+                        is_delete: false,
+                    },
+                    include: {
+                        model: survey_result,
+                        required: false,
+                        attributes: [ ],
+                    },
+                },
+            },
+            group: [ "survey_group.id", "survey_questions.id", "survey_questions->survey_choices.id", "type" ],
+        });
+
+        //reformat result
+        result = {
+            survey_id: result.dataValues.id,
+            name: result.dataValues.name,
+            description: result.dataValues.description,
+            question: result.dataValues.survey_questions.map(element => {
+                return {
+                    question_id: element.dataValues.id,
+                    question: element.dataValues.question,
+                    description: element.dataValues.description,
+                    choice: element.dataValues.survey_choices.map(element2 => {
+                        return {
+                            choice_id: element2.dataValues.id,
+                            choice: element2.dataValues.choice,
+                            type: element2.dataValues.type,
+                            description: element2.dataValues.description,
+                            count: element2.dataValues.count,
+                        };
+                    }),
+                };
+            }),
+        };
+
+        //add input string
+        let input_string = await survey_result.findAll({
+            attributes: [ "survey_question_id", "survey_choice_id", "result" ],
+            where: {
+                survey_group_id: survey_id,
+            },
+            include: {
+                model: survey_choice,
+                attributes: [ ],
+                where: {
+                    type: "input",
+                },
+            },
+        });
+        input_string = input_string.map(element => element.dataValues);
+
+        for (let i = 0; i < result.question.length; i++) {
+            for (let j = 0; j < result.question[i].choice.length; j++) {
+                if (result.question[i].choice[j].type == "input") {
+                    result.question[i].choice[j].input_string = input_string
+                    .filter(element => element.survey_question_id == result.question[i].question_id && element.survey_choice_id == result.question[i].choice[j].choice_id)
+                    .map(element => element.result);
+                }
+            }
+        }
+
+        //send response
+        return res.json({
+            result,
+        });
     } catch(err) {
         console.log(err);
         return res.status(404).json({ message: "not found" });

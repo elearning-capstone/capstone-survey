@@ -35,11 +35,14 @@ module.exports = (sequelize, DataTypes) => {
     });
 
     survey_result.associate = (models) => {
+        survey_result.belongsTo(models.survey_group, {
+            foreignKey: "survey_group_id",
+        });
         survey_result.belongsTo(models.survey_question, {
             foreignKey: "survey_question_id",
         });
-        survey_result.hasMany(models.survey_result, {
-            foreignKey: "survey_result_id",
+        survey_result.belongsTo(models.survey_choice, {
+            foreignKey: "survey_choice_id",
         });
     };
 
