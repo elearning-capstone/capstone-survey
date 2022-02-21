@@ -205,11 +205,12 @@ router.post("/", async (req, res) => {
         //reformat body
         let choices = {};
         let n = 0;
+        let is_valid = true;
 
         if (Array.isArray(result.question)) {
             result.question.forEach(element => {
                 if (!element.question_id) {
-                    return res.status(400).json({ message: "invalid body" });
+                    is_valid = false;
                 }
 
                 let question_id = element.question_id;
@@ -218,23 +219,23 @@ router.post("/", async (req, res) => {
                 if (Array.isArray(element.choice)) {
                     element.choice.forEach(element2 => {
                         if (typeof element2.choice_id != "number" || typeof element2.type != "string") {
-                            return res.status(400).json({ message: "invalid body" });
+                            is_valid = false;
                         }
 
                         if (element2.type != "checkbox" && element2.type != "select" && element2.type != "input") {
-                            return res.status(400).json({ message: "invalid body" });
+                            is_valid = false;
                         }
 
                         if (element2.type == "select") {
                             select += 1;
                             if (select > 1) {
-                                return res.status(400).json({ message: "invalid body" });
+                                is_valid = false;
                             }
                         }
 
                         if (element2.type == "input") {
                             if (typeof element2.result != "string") {
-                                return res.status(400).json({ message: "invalid body" });
+                                is_valid = false;
                             }
                         }
 
@@ -247,13 +248,16 @@ router.post("/", async (req, res) => {
                         };
                     });
                 } else if (element.choice) {
-                    return res.status(400).json({ message: "invalid body" });
+                    is_valid = false;
                 }
             });
+
+            if (!is_valid) return res.status(400).json({ message: "invalid body" });
         } else if (result.question) {
             return res.status(400).json({ message: "invalid body" });
         }
         //verify result
+        let is_valid = true;
         if (group.dataValues.survey_questions) {
             group.dataValues.survey_questions.forEach(element => {
                 let question_id = element.id;
@@ -266,16 +270,16 @@ router.post("/", async (req, res) => {
                             n -= 1;
 
                             if (c.question_id != question_id || c.type != element2.dataValues.type) {
-                                return res.status(400).json({ message: "invalid body" });
+                                is_valid = false;
                             }
                         } else if (element2.dataValues.type == "input") {
-                            return res.status(400).json({ message: "invalid body" });
+                            is_valid = false;
                         }
                     });    
                 }
             });
         }
-        if (n != 0) {
+        if (n != 0 || !is_valid) {
             return res.status(400).json({ message: "invalid body" });
         }
         //send database query
