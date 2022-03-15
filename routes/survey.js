@@ -257,7 +257,7 @@ router.post("/", async (req, res) => {
             return res.status(400).json({ message: "invalid body" });
         }
         //verify result
-        let is_valid = true;
+        is_valid = true;
         if (group.dataValues.survey_questions) {
             group.dataValues.survey_questions.forEach(element => {
                 let question_id = element.id;
