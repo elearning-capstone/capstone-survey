@@ -410,4 +410,31 @@ router.get("/result", async (req, res) => {
     }
 });
 
+router.get("/is_survey", async (req, res) => {
+    try {
+        const { survey_id, user_id } = req.query;
+
+        if (!survey_id || !user_id) {
+            return res.status(400).json({ message: "require survey_id and user_id" });
+        }
+
+        let count = await survey_result.count({
+            where: {
+                survey_group_id: survey_id,
+                user_id: user_id,
+            },
+        });
+
+        // user already done survey
+        if (count > 0) {
+            return res.json({ is_survey: true });
+        }
+
+        // user didn't do survey
+        return res.json({ is_survey: false });
+    } catch(err) {
+        return res.status(404).json({ message: "not found" });
+    }
+});
+
 module.exports = router;
