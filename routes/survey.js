@@ -458,13 +458,13 @@ router.get("/available", async (req, res) => {
             },
         });
 
-        return res.json({ available });
+        return res.json({ survey_id: available.map(element => element.survey_id) });
     } catch(err) {
         return res.status(404).json({ message: "not found" });
     }
 });
 
-const live_ip = ":3000/";
+const live_ip = ":3000";
 
 router.post("/live_survey", async (req, res) => {
     try {
@@ -472,7 +472,7 @@ router.post("/live_survey", async (req, res) => {
 
         req.query.survey_id = response.data.survey.group_id;
 
-        await axios.post(live_ip + "live/survey", { params: req.query });
+        await axios.post(live_ip + "/live/survey", { params: req.query });
 
         return res.status(200).json({ message: "success" });
     } catch(err) {
