@@ -1,4 +1,5 @@
 const express = require("express");
+const { Op } = require("sequelize");
 const router = express.Router();
 const { survey_group, survey_question, survey_choice, survey_result, sequelize } = require("../models");
 
@@ -432,6 +433,31 @@ router.get("/is_survey", async (req, res) => {
 
         // user didn't do survey
         return res.json({ is_survey: false });
+    } catch(err) {
+        return res.status(404).json({ message: "not found" });
+    }
+});
+
+router.get("/available", async (req, res) => {
+    try {
+        const { user_id, survey_id } = req.query;
+
+        if (!survey_id || !user_id) {
+            return res.status(400).json({ message: "require survey_id and user_id" });
+        }
+
+        let available = await survey_group.findAll({
+            attributes: [ ["id", "survey_id"] ],
+            raw: true,
+            where: {
+                id: {
+                    [Op.in]: survey_id,
+                    [Op.notIn]: sequelize.literal(`(select distinct survey_group_id as id from survey_results where survey_group_id in (${survey_id}) and user_id = ${user_id})`),
+                },
+            },
+        });
+
+        return res.json({ available });
     } catch(err) {
         return res.status(404).json({ message: "not found" });
     }
