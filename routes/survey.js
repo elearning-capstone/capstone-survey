@@ -446,8 +446,12 @@ router.get("/available", async (req, res) => {
     try {
         const { user_id, survey_id } = req.query;
 
-        if (!survey_id || !user_id) {
-            return res.status(400).json({ message: "require survey_id and user_id" });
+        if (!user_id) {
+            return res.status(400).json({ message: "require user_id" });
+        }
+
+        if (!survey_id) {
+            return res.status(200).json([]);
         }
 
         let available = await survey_group.findAll({
