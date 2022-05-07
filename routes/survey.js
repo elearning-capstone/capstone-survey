@@ -4,6 +4,9 @@ const router = express.Router();
 const axios = require("axios");
 const { survey_group, survey_question, survey_choice, survey_result, sequelize } = require("../models");
 
+const live_ip = "http://localhost:3000";
+const survey_ip = "http://localhost:3001";
+
 router.post("/create", async (req, res) => {
     try {
         //verify request
@@ -464,15 +467,13 @@ router.get("/available", async (req, res) => {
     }
 });
 
-const live_ip = ":3000";
-
 router.post("/live_survey", async (req, res) => {
     try {
-        let response = await axios.post("localhost:3000/survey/create", { params: req.query });
+        let response = await axios.post(survey_ip + "/survey/create", req.body, { params: req.query });
 
         req.query.survey_id = response.data.survey.group_id;
 
-        await axios.post(live_ip + "/live/survey", { params: req.query });
+        await axios.post(live_ip + "/live/survey", {}, { params: req.query });
 
         return res.status(200).json({ message: "success" });
     } catch(err) {
