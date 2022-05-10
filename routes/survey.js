@@ -4,8 +4,8 @@ const router = express.Router();
 const axios = require("axios");
 const { survey_group, survey_question, survey_choice, survey_result, sequelize } = require("../models");
 
-const live_ip = "http://localhost:3000";
-const survey_ip = "http://localhost:3001";
+const live_ip = "http://ip-172-31-38-32.ap-southeast-1.compute.internal:3000";
+const survey_ip = "http://ip-172-31-37-162.ap-southeast-1.compute.internal:3000";
 
 router.post("/create", async (req, res) => {
     try {
